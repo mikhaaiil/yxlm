@@ -46,4 +46,5 @@ class Widget(QtWidgets.QWidget, Ui_Form):
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     ex = Widget()
+    ex.show()
     sys.exit(app.exec())
