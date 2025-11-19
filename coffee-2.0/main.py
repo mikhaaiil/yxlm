@@ -7,6 +7,9 @@
 
 
 from PyQt6 import QtCore, QtGui, QtWidgets
+from window import AddEditWindow
+import sys
+import sqlite3
 
 
 class Ui_Form(object):
@@ -35,4 +38,58 @@ class Ui_Form(object):
         self.pushButton_2.setText(_translate("Form", "add"))
 
 
+class Widget(QtWidgets.QWidget, Ui_Form):
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+        self.pushButton.clicked.connect(self.get_changes)
+        self.pushButton_2.clicked.connect(self.add_data)
+        self.con = sqlite3.connect("coffee.sqlite")
+        self.cur = self.con.cursor()
+        self.set_data()
+    
+    def set_data(self):
+        self.cur.execute("SELECT * FROM coffee")
+        lines = self.cur.fetchall()
+        self.tableWidget.setColumnCount(7)
+        self.tableWidget.setRowCount(len(lines))
+        self.tableWidget.setHorizontalHeaderLabels(
+            ["id", "name", "roasting", "type", "taste", "price", "volume"]
+        )
+        for r, row in enumerate(lines):
+            for c, val in enumerate(row):
+                item = QtWidgets.QTableWidgetItem(str(val))
+                self.tableWidget.setItem(r, c, item)
+        _header = self.tableWidget.horizontalHeader()
+        _header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        _header.setStretchLastSection(True)
+    
+    def get_dialog_data(self, mode="add"):
+        if mode == "edit":
+            selected = self.tableWidget.selectedItems()
+        dialog = AddEditWindow(parent=self, mode=mode) if mode == "add" else \
+                 AddEditWindow(parent=self, mode=mode, item=selected)
+        if dialog.exec():
+            return dialog.get_data(), selected[0] if mode == "edit" else dialog.get_data()
 
+    def get_changes(self):
+        data, index = self.get_dialog_data("edit")
+        query = f"UPDATE coffee SET {', '.join([f'{name} = {f"\"{value}\"" if isinstance(value, str) else str(value)}' for name, value in data.items()])} WHERE id = {index.text()}"
+        print(query)
+        self.cur.execute(query)
+        self.con.commit()
+        self.set_data()
+
+    def add_data(self):
+        data = self.get_dialog_data()[0]
+        query = f"INSERT INTO coffee(name, roasting, type, taste, price, volume) VALUES" \
+                f"({", ".join(f"\"{value}\"" if isinstance(value, str) else str(value) for value in data.values())})"
+        self.cur.execute(query)
+        self.con.commit()
+        self.set_data()
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    ex = Widget()
+    ex.show()
+    sys.exit(app.exec())
